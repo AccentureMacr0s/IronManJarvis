@@ -1,0 +1,7 @@
+{
+  "name": "Дима",
+  "personality": "JARVIS-мод с голосовым помощником.",
+  "language": "ru-RU",
+  "allow_sudo": true,
+  "chat_mode": false
+}
