@@ -1,0 +1,81 @@
+# AI Content Fabric Platform
+# Local development environment with all services
+
+version: "3.8"
+
+services:
+  # Platform application
+  platform:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../:/app
+      - ./output:/app/output
+    environment:
+      - PLATFORM_WEB__PORT=8000
+      - PLATFORM_LLM__BASE_URL=http://ollama:11434
+      - PLATFORM_RENDER__COMFYUI_URL=http://comfyui:8188
+    depends_on:
+      - ollama
+    networks:
+      - fabric-net
+
+  # Local LLM server
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - fabric-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Workflow automation
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=changeme
+    networks:
+      - fabric-net
+
+  # AI image generation
+  comfyui:
+    image: comfyanonymous/comfyui:latest
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui-data:/app/models
+    networks:
+      - fabric-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  ollama-data:
+  n8n-data:
+  comfyui-data:
+
+networks:
+  fabric-net:
+    driver: bridge

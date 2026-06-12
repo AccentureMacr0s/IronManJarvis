@@ -1,0 +1,46 @@
+# AI Content Fabric Platform Configuration
+
+platform:
+  name: "AI Content Fabric"
+  version: "0.1.0"
+
+web:
+  host: "0.0.0.0"
+  port: 8000
+
+scheduler:
+  timezone: "UTC"
+
+tasks:
+  max_concurrent: 3
+
+trends:
+  check_interval_minutes: 120
+  hotwords:
+    - "AI"
+    - "machine learning"
+    - "automation"
+    - "DevOps"
+    - "content creation"
+  rss_feeds:
+    - "https://news.ycombinator.com/rss"
+    - "https://www.reddit.com/r/artificial/.rss"
+
+publish:
+  targets:
+    - "local"
+  output_dir: "./output"
+
+llm:
+  provider: "ollama"  # ollama | openai
+  model: "qwen2.5:7b"
+  base_url: "http://localhost:11434"
+
+tts:
+  engine: "local"  # local | elevenlabs
+  voice: "default"
+
+render:
+  engine: "comfyui"  # comfyui | blender
+  comfyui_url: "http://localhost:8188"
+  blender_path: "/usr/bin/blender"
