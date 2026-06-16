@@ -23,7 +23,7 @@ Backward-compatible CLI entrypoint:
 
 `devai` flow for logs:
 
-`pipeline.log -> read file -> extract errors -> classify failure -> detect component -> build structured event -> render jira template -> stdout/jira.md`
+`pipeline.log -> mirror parser -> DSMatrix scoring -> rule engine (rules/*.yml) -> repo context snapshot -> structured incident -> jira template -> stdout/jira.md`
 
 Structured result fields:
 
@@ -32,6 +32,10 @@ Structured result fields:
 - `severity`
 - `matches`
 - `evidence`
+- `root_cause`
+- `mirror_terms`
+- `dsmatrix`
+- `repo_context`
 
 ## Rules
 

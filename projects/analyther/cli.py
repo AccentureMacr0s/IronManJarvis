@@ -7,8 +7,11 @@ import argparse
 import json
 import re
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
+
+from . import mirror_parser, repo_context, rule_engine
 
 CRITICAL_PATTERNS = {
     "CI_FAILURE": [r"\bci\b", r"pipeline", r"runner", r"job failed"],
@@ -47,9 +50,20 @@ FIND_PATTERNS = [
     "**/*.yaml",
 ]
 
+RULES_DIR = Path(__file__).resolve().parents[2] / "rules"
+
 
 class DeVAIError(Exception):
     """Base command error."""
+
+
+@lru_cache(maxsize=1)
+def _loaded_rules() -> tuple[rule_engine.Rule, ...]:
+    return tuple(rule_engine.load_rules(RULES_DIR))
+
+
+def _rank_with_dsmatrix(lines: list[str]) -> list[dict]:
+    return rule_engine.rank_rules("\n".join(lines), list(_loaded_rules()))
 
 
 def _read_lines(file_path: Path) -> list[str]:
@@ -87,13 +101,30 @@ def detect_component(file_path: Path, entries: Iterable[tuple[int, str, str]]) -
     return "Infrastructure"
 
 
-def build_structured_event(source: str, component: str, entries: list[tuple[int, str, str]]) -> dict:
+def build_structured_event(
+    source: str,
+    component: str,
+    entries: list[tuple[int, str, str]],
+    ranked_rules: list[dict],
+    top_terms: list[str],
+    context_snapshot: dict,
+) -> dict:
     grouped = Counter(entry[1] for entry in entries)
     primary_type = grouped.most_common(1)[0][0] if grouped else "NO_FAILURE"
+    top_rule = ranked_rules[0] if ranked_rules else None
+    if top_rule and top_rule["score"] >= 0.45:
+        component = top_rule["component"]
+        if primary_type == "NO_FAILURE":
+            primary_type = top_rule["type"]
+
+    severity = SEVERITY_BY_TYPE.get(primary_type, "medium")
+    if top_rule and top_rule["score"] >= 0.45:
+        severity = top_rule["severity"]
+
     return {
         "type": primary_type,
         "component": component,
-        "severity": SEVERITY_BY_TYPE.get(primary_type, "medium"),
+        "severity": severity,
         "matches": len(entries),
         "evidence": [
             {"line": line_num, "type": failure_type, "text": text}
@@ -102,6 +133,10 @@ def build_structured_event(source: str, component: str, entries: list[tuple[int,
         "source": source,
         "grouped_by_type": dict(grouped),
         "error": entries[-1][2] if entries else "No critical issue detected",
+        "root_cause": top_rule["name"] if top_rule and top_rule["score"] > 0 else "unknown",
+        "mirror_terms": top_terms,
+        "dsmatrix": ranked_rules[:3],
+        "repo_context": context_snapshot,
     }
 
 
@@ -116,7 +151,17 @@ def analyze_logs(file_path: Path, limit: int = 50) -> dict:
 
     latest_entries = critical_entries[-limit:]
     component = detect_component(file_path, latest_entries)
-    structured = build_structured_event(str(file_path), component, latest_entries)
+    ranked_rules = _rank_with_dsmatrix(lines)
+    mirror_terms = mirror_parser.top_terms(mirror_parser.extract_from_lines(lines))
+    context_snapshot = repo_context.scan(Path.cwd())
+    structured = build_structured_event(
+        str(file_path),
+        component,
+        latest_entries,
+        ranked_rules,
+        mirror_terms,
+        context_snapshot,
+    )
 
     return {
         "file": str(file_path),
@@ -158,7 +203,17 @@ def analyze_context(context: str, attachments: list[Path], limit: int = 50) -> d
         elif any("gitlab" in path.name.lower() for path in attachments):
             component = "CI/CD"
 
-    structured = build_structured_event("context+attachments", component, latest_entries)
+    ranked_rules = _rank_with_dsmatrix(lines)
+    mirror_terms = mirror_parser.top_terms(mirror_parser.extract_from_lines(lines))
+    context_snapshot = repo_context.scan(Path.cwd())
+    structured = build_structured_event(
+        "context+attachments",
+        component,
+        latest_entries,
+        ranked_rules,
+        mirror_terms,
+        context_snapshot,
+    )
 
     return {
         "file": "context+attachments",
@@ -190,6 +245,7 @@ def render_jira_template(analysis: dict) -> str:
             f"Type: {structured['type']}",
             f"Component: {structured['component']}",
             f"Severity: {structured['severity']}",
+            f"Root Cause: {structured['root_cause']}",
             f"Error: {structured['error']}",
             f"Impact: {impact}",
             f"Proposed Fix: {proposed_fix}",
@@ -205,11 +261,29 @@ def render_jira_markdown(analysis: dict) -> str:
         f"- **Type:** {structured['type']}",
         f"- **Component:** {structured['component']}",
         f"- **Severity:** {structured['severity']}",
+        f"- **Root Cause:** {structured['root_cause']}",
         f"- **Matches:** {structured['matches']}",
         f"- **Source:** {structured['source']}",
         "",
-        "## Evidence",
+        "## Mirror Terms",
     ]
+    lines.extend([f"- `{term}`" for term in structured["mirror_terms"][:10]])
+    lines.extend(
+        [
+            "",
+            "## DSMatrix Ranking",
+        ]
+    )
+    if structured["dsmatrix"]:
+        lines.extend([f"- **{row['name']}**: `{row['score']}` ({row['component']})" for row in structured["dsmatrix"]])
+    else:
+        lines.append("- No rule matches.")
+    lines.extend(
+        [
+            "",
+        "## Evidence",
+        ]
+    )
     if structured["evidence"]:
         lines.extend([f"- L{item['line']} [{item['type']}] {item['text']}" for item in structured["evidence"]])
     else:
@@ -236,6 +310,7 @@ def command_logs(args: argparse.Namespace) -> int:
     print(f"Type: {structured['type']}")
     print(f"Component: {structured['component']}")
     print(f"Severity: {structured['severity']}")
+    print(f"Root cause: {structured['root_cause']}")
 
     print("\nGrouped by type:")
     if structured["grouped_by_type"]:
@@ -250,6 +325,11 @@ def command_logs(args: argparse.Namespace) -> int:
             print(f"[{entry['line']}] ({entry['type']}) {entry['text']}")
     else:
         print("- none")
+
+    if structured["dsmatrix"]:
+        print("\nDSMatrix top rules:")
+        for row in structured["dsmatrix"]:
+            print(f"- {row['name']}: score={row['score']}")
 
     if args.json:
         print("\nJSON:")
