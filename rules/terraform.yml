@@ -1,0 +1,4 @@
+name: terraform
+component: Terraform
+keywords: [terraform, tfstate, provider, resource, plan failed, apply failed]
+severity: high

@@ -1,0 +1,4 @@
+name: gitlab_runner
+component: CI/CD
+keywords: [gitlab, runner, pipeline, job failed]
+severity: high

@@ -1,0 +1,4 @@
+name: powershell
+component: Windows Automation
+keywords: [powershell, ps1, execution policy]
+severity: medium
