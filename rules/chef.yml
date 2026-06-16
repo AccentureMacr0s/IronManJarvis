@@ -1,0 +1,4 @@
+name: chef
+component: Configuration Management
+keywords: [chef, recipe, cookbook, converge]
+severity: medium

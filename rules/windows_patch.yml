@@ -1,0 +1,4 @@
+name: windows_patch
+component: Patch Management
+keywords: [windows update, kb, patch, wsus]
+severity: medium

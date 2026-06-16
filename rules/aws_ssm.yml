@@ -1,0 +1,4 @@
+name: aws_ssm
+component: AWS SSM
+keywords: [ssm, session manager, managed instance]
+severity: medium
