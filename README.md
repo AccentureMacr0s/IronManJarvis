@@ -52,3 +52,13 @@ rules/
 ├── windows_patch.yml
 └── powershell.yml
 ```
+
+## Ruby DSMATRIX core (minimal kernel)
+
+Location:
+
+`/home/runner/work/IronManJarvis/IronManJarvis/projects/analyther/dsmatrix/`
+
+Run:
+
+`ruby /home/runner/work/IronManJarvis/IronManJarvis/projects/analyther/dsmatrix/dsmatrix.rb /home/runner/work/IronManJarvis/IronManJarvis/projects/analyther/dsmatrix/sample.log`
