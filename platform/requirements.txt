@@ -1,0 +1,20 @@
+# AI Content Fabric Platform - Dependencies
+
+# Core
+pyyaml>=6.0
+apscheduler>=3.10.0
+
+# Web
+fastapi>=0.109.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.0
+
+# Trend watching
+feedparser>=6.0
+
+# Future integrations (uncomment as needed)
+# httpx>=0.25.0          # async HTTP client
+# ollama>=0.1.0          # local LLM
+# openai>=1.0            # OpenAI API fallback
+# pyttsx3>=2.90          # local TTS
+# pillow>=10.0           # image processing

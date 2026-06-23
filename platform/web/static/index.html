@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Content Fabric - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        header {
+            background: linear-gradient(135deg, #1a1a3e, #0d0d2b);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #2a2a5a;
+        }
+        header h1 {
+            color: #00d4ff;
+            font-size: 1.5rem;
+        }
+        header p { color: #888; font-size: 0.9rem; margin-top: 0.3rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .card {
+            background: #12122a;
+            border: 1px solid #2a2a5a;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .card h2 {
+            color: #00d4ff;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #1a1a3a;
+        }
+        .stat:last-child { border-bottom: none; }
+        .stat-value { color: #00d4ff; font-weight: bold; }
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .badge-running { background: #1a4a1a; color: #4ade80; }
+        .badge-pending { background: #4a4a1a; color: #fbbf24; }
+        .badge-completed { background: #1a1a4a; color: #60a5fa; }
+        .btn {
+            background: #00d4ff;
+            color: #0a0a1a;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 1rem;
+        }
+        .btn:hover { background: #00b8e0; }
+        #tasks-list, #events-list { max-height: 300px; overflow-y: auto; }
+        .task-item, .event-item {
+            padding: 0.6rem;
+            border-bottom: 1px solid #1a1a3a;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎬 AI Content Fabric Platform</h1>
+        <p>Local content generation service with scheduled tasks and trend monitoring</p>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Overview Card -->
+            <div class="card">
+                <h2>📊 Overview</h2>
+                <div id="overview">
+                    <div class="stat">
+                        <span>Tasks Total</span>
+                        <span class="stat-value" id="tasks-total">-</span>
+                    </div>
+                    <div class="stat">
+                        <span>Running</span>
+                        <span class="stat-value" id="tasks-running">-</span>
+                    </div>
+                    <div class="stat">
+                        <span>Completed</span>
+                        <span class="stat-value" id="tasks-completed">-</span>
+                    </div>
+                    <div class="stat">
+                        <span>Scheduled Jobs</span>
+                        <span class="stat-value" id="scheduled-jobs">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Episodes Card -->
+            <div class="card">
+                <h2>🎥 Episodes</h2>
+                <div id="episodes-list">
+                    <p style="color: #666;">No episodes yet</p>
+                </div>
+                <button class="btn" onclick="createEpisode()">+ New Episode</button>
+            </div>
+
+            <!-- Tasks Card -->
+            <div class="card">
+                <h2>⚡ Recent Tasks</h2>
+                <div id="tasks-list">
+                    <p style="color: #666;">No tasks yet</p>
+                </div>
+            </div>
+
+            <!-- Events Card -->
+            <div class="card">
+                <h2>📡 Event Stream</h2>
+                <div id="events-list">
+                    <p style="color: #666;">No events yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+
+        async function fetchOverview() {
+            try {
+                const res = await fetch(`${API}/analytics/overview`);
+                const data = await res.json();
+                document.getElementById('tasks-total').textContent = data.tasks.total;
+                document.getElementById('tasks-running').textContent = data.tasks.running;
+                document.getElementById('tasks-completed').textContent = data.tasks.completed;
+                document.getElementById('scheduled-jobs').textContent = Object.keys(data.scheduled_jobs).length;
+            } catch (e) {
+                console.error('Failed to fetch overview:', e);
+            }
+        }
+
+        async function fetchTasks() {
+            try {
+                const res = await fetch(`${API}/analytics/tasks?limit=10`);
+                const tasks = await res.json();
+                const list = document.getElementById('tasks-list');
+                if (tasks.length === 0) return;
+                list.innerHTML = tasks.map(t => `
+                    <div class="task-item">
+                        <span class="badge badge-${t.status}">${t.status}</span>
+                        <strong>${t.name}</strong>
+                        <span style="color:#666;"> (${t.source})</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to fetch tasks:', e);
+            }
+        }
+
+        async function fetchEvents() {
+            try {
+                const res = await fetch(`${API}/analytics/events?limit=10`);
+                const events = await res.json();
+                const list = document.getElementById('events-list');
+                if (events.length === 0) return;
+                list.innerHTML = events.map(e => `
+                    <div class="event-item">
+                        <strong>${e.name}</strong>
+                        <span style="color:#666;"> ${JSON.stringify(e.data).slice(0, 60)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to fetch events:', e);
+            }
+        }
+
+        async function createEpisode() {
+            const prompt = window.prompt('Enter episode prompt:');
+            if (!prompt) return;
+            try {
+                await fetch(`${API}/episodes/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, title: '', source: 'user' })
+                });
+                refresh();
+            } catch (e) {
+                console.error('Failed to create episode:', e);
+            }
+        }
+
+        function refresh() {
+            fetchOverview();
+            fetchTasks();
+            fetchEvents();
+        }
+
+        // Auto-refresh every 5 seconds
+        refresh();
+        setInterval(refresh, 5000);
+    </script>
+</body>
+</html>
